@@ -70,3 +70,49 @@ jobs:
 
       - name: Upload assets to nightly release
         run: gh release upload ${{ vars.NIGHTLY_TAG }} dist/{*.tar.gz,*.zip,*.tar.zst,*.deb,*.rpm,*.apk,checksums.txt} --clobber
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: dist/checksums.txt
+          if-no-files-found: error
+
+
+  release_nightly_windows7:
+    needs: release_nightly
+    name: Release Windows 7 Nightly
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go 1.23
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.7
+          check-latest: true
+
+      - name: Build Windows 7 Binaries
+        run: |
+          go version
+          rm go.mod go.sum
+          go mod init github.com/ayoisaiah/f2/v2
+          go mod tidy
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags '-extldflags "-static"' -o f2.exe
+          zip f2_master_windows7-amd64.zip f2.exe
+          CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -ldflags '-extldflags "-static"' -o f2.exe
+          zip f2_master_windows7-386.zip f2.exe
+
+      - name: Download checksums
+        uses: actions/download-artifact@v4
+        with:
+          name: checksums
+
+      - name: Modify checksums
+        run: |
+          sha256sum f2_master_windows7-amd64.zip >> checksums.txt
+          sha256sum f2_master_windows7-386.zip >> checksums.txt
+
+      - name: Upload assets to nightly release
+        run: gh release upload ${{ vars.NIGHTLY_TAG }} ./{*.zip,checksums.txt} --clobber
